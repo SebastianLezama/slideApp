@@ -51,8 +51,84 @@ function App() {
   // const DISCOVERY_DOC = import.meta.env.DRIVE_ID
   const DISCOVERY_DOC = 'https://www.googleapis.com/discovery/v1/apis/drive/v3/rest';
   const CLIENT_ID = import.meta.env.VITE_CLIENT_ID
-  const GOOGLE_ID = import.meta.env.GOOGLE_ID
+  const GOOGLE_ID = import.meta.env.VITE_GOOGLE_ID
   const SCOPES = 'https://www.googleapis.com/auth/drive.readonly';
+
+  let tokenClient;
+  let gapiInited = false;
+  let gisInited = false;
+  
+      function gapiLoaded() {
+        gapi.load('client', initializeGapiClient);
+      }
+      async function initializeGapiClient() {
+        await gapi.client.init({
+          apiKey: API_KEY,
+          discoveryDocs: [DISCOVERY_DOC],
+        });
+        gapiInited = true;
+        maybeEnableButtons();
+      }
+      function gisLoaded() {
+        tokenClient = google.accounts.oauth2.initTokenClient({
+          client_id: CLIENT_ID,
+          scope: SCOPES,
+          callback: '', // defined later
+        });
+        gisInited = true;
+        maybeEnableButtons();
+      }
+
+      function handleAuthClick() {
+        tokenClient.callback = async (resp) => {
+          if (resp.error !== undefined) {
+            throw (resp);
+          }
+          document.getElementById('signout_button').style.visibility = 'visible';
+          document.getElementById('authorize_button').innerText = 'Refresh';
+          await listFiles();
+        };
+
+        if (gapi.client.getToken() === null) {
+          // Prompt the user to select a Google Account and ask for consent to share their data
+          // when establishing a new session.
+          tokenClient.requestAccessToken({prompt: 'consent'});
+        } else {
+          // Skip display of account chooser and consent dialog for an existing session.
+          tokenClient.requestAccessToken({prompt: ''});
+        }
+    const auth = gapi.auth2.getAuthInstance();
+
+      }
+
+      /**
+       *  Sign out the user upon button click.
+       */
+      function handleSignoutClick() {
+        const token = gapi.client.getToken();
+        if (token !== null) {
+          google.accounts.oauth2.revoke(token.access_token);
+          gapi.client.setToken('');
+          document.getElementById('content').innerText = '';
+          document.getElementById('authorize_button').innerText = 'Authorize';
+          // document.getElementById('signout_button').style.visibility = 'hidden';
+        }
+      }
+
+      /**
+       * Print metadata for first 10 files.
+       */
+      async function listFiles() {
+        let response;
+        try {
+          response = await gapi.client.drive.files.list({
+            'pageSize': 10,
+            'fields': 'files(id, name)',
+          });
+        } catch (err) {
+          throw err
+      }
+    }
 
   const getFotosFromDrive = async ( ) => {
     async function initializeGapiClient() {
@@ -60,92 +136,72 @@ function App() {
         apiKey: API_KEY,
         clientId: CLIENT_ID,
         scope: SCOPES,
-      }).then(async function() {
-        return await gapi.client.request({
-          path: SCOPES,
-          discoveryDocs: DISCOVERY_DOC,
+      })
+      // .then(async function() {
+        //   gapiInited = true
+        //   return await gapi.client.request({
+        // discoveryDocs: DISCOVERY_DOC,
+      //     path: SCOPES,
           
-        });
-    })
-    .then(
-      function () {
-        tokenClient = google.accounts.oauth2.initTokenClient({
-          client_id: CLIENT_ID,
-          scope: SCOPES,
-          // callback: '', // defined later
-        });}
-      // function (error) {}
-    );
+      //   });
+      // })
+    // .then(
+    //   function () {
+    //     tokenClient = google.accounts.oauth2.initTokenClient({
+    //       client_id: CLIENT_ID,
+    //       scope: SCOPES,
+    //       // callback: '', // defined later
+    //     });}
+      
+    //   );
     }
     
     await gapi.load('client', initializeGapiClient);
+    const auth = gapi.auth2.getAuthInstance();
   };
 
   useEffect(() => {
 
-    getFotosFromDrive()
+    // getFotosFromDrive()
+    gapiLoaded()
+    gisLoaded()
+    // handleAuthClick()
+    listFiles()
   
       
 
     
   }, [])
 
-  // useEffect(() => {
-  //   gapi.load('client:auth2', initClient);
 
-  //   function initClient() {
-  //     gapi.client.init({
-  //       discoveryDocs: ["https://www.googleapis.com/discovery/v1/apis/drive/v3/rest"],
-  //       clientId: GOOGLE_ID,
-  //       scope: 'https://www.googleapis.com/auth/drive.metadata.readonly'
-  //     }).then(function () {
-  //       // do stuff with loaded APIs
-  //       console.log('it worked');
-  //     });
-  //   }
-  
-    
-  // }, [])
   
 
   return (
-    <section className="section">
-      {/* <div className="title">
-        <h2>
-          <span>/</span>reviews
-        </h2>
-      </div> */}
-      <div className="section-center">
-        {people.map((person, personIndex) => {
-          const { id, image, name } = person;
-          let position = "nextSlide";
-          if (personIndex === index) {
-            position = "activeSlide";
-          }
-          if (
-            personIndex === index - 1 ||
-            (index === 0 && personIndex === people.length - 1)
-          ) {
-            position = "lastSlide";
-          }
-          return (
-            <article key={id} className={position}>
-              <img src={image} alt={name} className="person-img" />
-              {/* <h4>{name}</h4>
-              <p className="title">{title}</p>
-              <p className="text">{quote}</p> */}
-              {/* <FaQuoteRight className="icon" /> */}
-            </article>
-          );
-        })}
-        {/* <button className="prev" onClick={() => setIndex(index - 1)}>
-          <FiChevronLeft />
-        </button>
-        <button className="next" onClick={() => setIndex(index + 1)}>
-          <FiChevronRight />
-        </button> */}
-      </div>
-    </section>
+    <>
+      <section className="section">
+        <div className="section-center">
+          {people.map((person, personIndex) => {
+            const { id, image, name } = person;
+            let position = "nextSlide";
+            if (personIndex === index) {
+              position = "activeSlide";
+            }
+            if (
+              personIndex === index - 1 ||
+              (index === 0 && personIndex === people.length - 1)
+              ) {
+                position = "lastSlide";
+              }
+              return (
+                <article key={id} className={position}>
+                <img src={image} alt={name} className="person-img" />
+                
+              </article>
+            );
+          })}
+        </div>
+      </section>
+        </>
   );
 }
 
